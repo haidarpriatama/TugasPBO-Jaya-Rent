@@ -1,0 +1,4 @@
+PLG-001;Haidar Rafi Apta Priatama;3374011201010001;081234567890;Jl. Tembalang Baru No. 10, Semarang;Laki-laki
+PLG-002;Muhammad Arya Putra;3374011201010002;085678901234;Jl. Banjarsari Selatan No. 5, Semarang;Laki-laki
+PLG-003;Chico Diar Ramadhan;3374011201010003;087812345678;Jl. Prof. Soedarto No. 12, Semarang;Laki-laki
+PLG-004;Siti Nurhaliza;3374011201010004;081399887766;Jl. Pandanaran No. 45, Semarang;Perempuan

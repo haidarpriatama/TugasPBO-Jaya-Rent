@@ -1,0 +1,7 @@
+MOBIL;KND-001;B 1234 ABC;Toyota;Avanza Veloz;2023;400000.0;false;MPV;Otomatis;7
+MOBIL;KND-002;H 8888 XY;Honda;HR-V RS Turbo;2024;650000.0;true;SUV;Otomatis;5
+MOBIL;KND-003;B 5678 JKL;Mitsubishi;Pajero Sport;2023;850000.0;false;SUV;Otomatis;7
+MOTOR;KND-004;H 4321 ZA;Honda;Vario 160;2024;90000.0;true;Matic;160;true
+MOTOR;KND-005;B 3141 PI;Yamaha;NMAX 155 Connected;2023;120000.0;true;Matic;155;true
+BUS;KND-006;H 7777 BUS;Isuzu;Elf Microbus Long;2023;1200000.0;true;20;false;true
+BUS;KND-007;AD 9999 PO;Mercedes-Benz;OH 1626 Jetbus 5;2024;2500000.0;true;48;true;true
