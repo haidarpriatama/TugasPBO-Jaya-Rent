@@ -5,9 +5,15 @@
 ---
 
 ## Anggota Kelompok 7
+<<<<<<< HEAD
 1. **Kevin Nibras Kusuma** NIM: 21120124140131
 2. **Hanif Arifandi Zulfikar** NIM: 21120124140154
 3. **Haidar Rafi Apta Priatama** NIM: 21120124140107
+=======
+1. **Kevin Nibras Kusuma** (NIM: 21120124140131)
+2. **Hanif Arifandi Zulfikar** (NIM: 21120124140154)
+3. **Haidar Rafi Apta Priatama** (NIM: 21120124140107)
+>>>>>>> origin/main
 
 ---
 
