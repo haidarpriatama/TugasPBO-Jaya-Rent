@@ -1,0 +1,2 @@
+TRX-1002;PLG-002;KND-003;2026-11-19;2;false;false;1750000.0;AKTIF;Keperluan wisuda kampus
+TRX-1001;PLG-001;KND-001;2026-11-18;4;true;true;2355000.0;AKTIF;Perjalanan dinas luar kota
