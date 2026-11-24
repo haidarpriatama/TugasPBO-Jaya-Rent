@@ -1,5 +1,7 @@
 package rentalkendaraan.service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import rentalkendaraan.exception.DataValidasiException;
@@ -17,7 +19,7 @@ public class RentalManager {
     private final List<Pelanggan> daftarPelanggan;
     private final List<TransaksiSewa> daftarTransaksi;
 
-    // Koleksi Generics Map untuk pencarian O(1) berdasarkan ID
+    // Koleksi Generics Map untuk pencarian O(1) berdasarkan ID (selalu dinormalisasi uppercase)
     private final Map<String, Kendaraan> kendaraanMap;
     private final Map<String, Pelanggan> pelangganMap;
     private final Map<String, TransaksiSewa> transaksiMap;
@@ -25,6 +27,10 @@ public class RentalManager {
     private final FileStorageService storageService;
 
     public RentalManager() {
+        this(new FileStorageService());
+    }
+
+    public RentalManager(FileStorageService storageService) {
         this.daftarKendaraan = new ArrayList<>();
         this.daftarPelanggan = new ArrayList<>();
         this.daftarTransaksi = new ArrayList<>();
@@ -33,7 +39,7 @@ public class RentalManager {
         this.pelangganMap = new HashMap<>();
         this.transaksiMap = new HashMap<>();
 
-        this.storageService = new FileStorageService();
+        this.storageService = (storageService != null) ? storageService : new FileStorageService();
         muatSemuaData();
     }
 
@@ -42,19 +48,19 @@ public class RentalManager {
             List<Kendaraan> kList = storageService.muatDataKendaraan();
             for (Kendaraan k : kList) {
                 daftarKendaraan.add(k);
-                kendaraanMap.put(k.getIdKendaraan(), k);
+                kendaraanMap.put(k.getIdKendaraan().trim().toUpperCase(), k);
             }
 
             List<Pelanggan> pList = storageService.muatDataPelanggan();
             for (Pelanggan p : pList) {
                 daftarPelanggan.add(p);
-                pelangganMap.put(p.getIdPelanggan(), p);
+                pelangganMap.put(p.getIdPelanggan().trim().toUpperCase(), p);
             }
 
             List<TransaksiSewa> tList = storageService.muatDataTransaksi(pelangganMap, kendaraanMap);
             for (TransaksiSewa t : tList) {
                 daftarTransaksi.add(t);
-                transaksiMap.put(t.getIdTransaksi(), t);
+                transaksiMap.put(t.getIdTransaksi().trim().toUpperCase(), t);
                 // Sinkronisasi status ketersediaan kendaraan jika masih ada transaksi AKTIF
                 if ("AKTIF".equalsIgnoreCase(t.getStatusTransaksi()) && t.getKendaraan() != null) {
                     t.getKendaraan().setStatusTersedia(false);
@@ -73,7 +79,8 @@ public class RentalManager {
     }
 
     public Kendaraan cariKendaraanById(String id) {
-        return kendaraanMap.get(id);
+        if (id == null) return null;
+        return kendaraanMap.get(id.trim().toUpperCase());
     }
 
     public String generateNextIdKendaraan() {
@@ -92,7 +99,7 @@ public class RentalManager {
 
     public void tambahKendaraan(Kendaraan k) throws RentalException {
         if (k == null) throw new DataValidasiException("Data kendaraan tidak boleh null.");
-        // Cek duplikasi nomor plat
+        // Cek duplikasi nomor plat & ID
         for (Kendaraan existing : daftarKendaraan) {
             if (existing.getNomorPlat().equalsIgnoreCase(k.getNomorPlat())) {
                 throw new DataValidasiException("Nomor plat [" + k.getNomorPlat() + "] sudah terdaftar!");
@@ -102,13 +109,13 @@ public class RentalManager {
             }
         }
         daftarKendaraan.add(k);
-        kendaraanMap.put(k.getIdKendaraan(), k);
+        kendaraanMap.put(k.getIdKendaraan().trim().toUpperCase(), k);
         storageService.simpanDataKendaraan(daftarKendaraan);
     }
 
     public void updateKendaraan(Kendaraan kBaru) throws RentalException {
         if (kBaru == null) throw new DataValidasiException("Data kendaraan tidak boleh null.");
-        Kendaraan target = kendaraanMap.get(kBaru.getIdKendaraan());
+        Kendaraan target = kendaraanMap.get(kBaru.getIdKendaraan().trim().toUpperCase());
         if (target == null) {
             throw new DataValidasiException("Kendaraan dengan ID " + kBaru.getIdKendaraan() + " tidak ditemukan.");
         }
@@ -123,12 +130,15 @@ public class RentalManager {
 
         int index = daftarKendaraan.indexOf(target);
         daftarKendaraan.set(index, kBaru);
-        kendaraanMap.put(kBaru.getIdKendaraan(), kBaru);
+        kendaraanMap.put(kBaru.getIdKendaraan().trim().toUpperCase(), kBaru);
         storageService.simpanDataKendaraan(daftarKendaraan);
     }
 
     public void hapusKendaraan(String idKendaraan) throws RentalException {
-        Kendaraan k = kendaraanMap.get(idKendaraan);
+        if (idKendaraan == null || idKendaraan.trim().isEmpty()) {
+            throw new DataValidasiException("ID Kendaraan tidak boleh kosong.");
+        }
+        Kendaraan k = kendaraanMap.get(idKendaraan.trim().toUpperCase());
         if (k == null) {
             throw new DataValidasiException("Kendaraan tidak ditemukan.");
         }
@@ -141,7 +151,7 @@ public class RentalManager {
             }
         }
         daftarKendaraan.remove(k);
-        kendaraanMap.remove(idKendaraan);
+        kendaraanMap.remove(idKendaraan.trim().toUpperCase());
         storageService.simpanDataKendaraan(daftarKendaraan);
     }
 
@@ -174,7 +184,8 @@ public class RentalManager {
     }
 
     public Pelanggan cariPelangganById(String id) {
-        return pelangganMap.get(id);
+        if (id == null) return null;
+        return pelangganMap.get(id.trim().toUpperCase());
     }
 
     public String generateNextIdPelanggan() {
@@ -202,13 +213,13 @@ public class RentalManager {
             }
         }
         daftarPelanggan.add(p);
-        pelangganMap.put(p.getIdPelanggan(), p);
+        pelangganMap.put(p.getIdPelanggan().trim().toUpperCase(), p);
         storageService.simpanDataPelanggan(daftarPelanggan);
     }
 
     public void updatePelanggan(Pelanggan pBaru) throws RentalException {
         if (pBaru == null) throw new DataValidasiException("Data pelanggan tidak boleh null.");
-        Pelanggan target = pelangganMap.get(pBaru.getIdPelanggan());
+        Pelanggan target = pelangganMap.get(pBaru.getIdPelanggan().trim().toUpperCase());
         if (target == null) {
             throw new DataValidasiException("Pelanggan tidak ditemukan.");
         }
@@ -220,12 +231,15 @@ public class RentalManager {
         }
         int idx = daftarPelanggan.indexOf(target);
         daftarPelanggan.set(idx, pBaru);
-        pelangganMap.put(pBaru.getIdPelanggan(), pBaru);
+        pelangganMap.put(pBaru.getIdPelanggan().trim().toUpperCase(), pBaru);
         storageService.simpanDataPelanggan(daftarPelanggan);
     }
 
     public void hapusPelanggan(String idPelanggan) throws RentalException {
-        Pelanggan p = pelangganMap.get(idPelanggan);
+        if (idPelanggan == null || idPelanggan.trim().isEmpty()) {
+            throw new DataValidasiException("ID Pelanggan tidak boleh kosong.");
+        }
+        Pelanggan p = pelangganMap.get(idPelanggan.trim().toUpperCase());
         if (p == null) {
             throw new DataValidasiException("Pelanggan tidak ditemukan.");
         }
@@ -238,7 +252,7 @@ public class RentalManager {
             }
         }
         daftarPelanggan.remove(p);
-        pelangganMap.remove(idPelanggan);
+        pelangganMap.remove(idPelanggan.trim().toUpperCase());
         storageService.simpanDataPelanggan(daftarPelanggan);
     }
 
@@ -261,6 +275,11 @@ public class RentalManager {
     // =========================================================================
     public List<TransaksiSewa> getDaftarTransaksi() {
         return Collections.unmodifiableList(daftarTransaksi);
+    }
+
+    public TransaksiSewa cariTransaksiById(String id) {
+        if (id == null) return null;
+        return transaksiMap.get(id.trim().toUpperCase());
     }
 
     public String generateNextIdTransaksi() {
@@ -293,46 +312,107 @@ public class RentalManager {
         k.setStatusTersedia(false);
 
         daftarTransaksi.add(0, trx); // letakkan di paling atas
-        transaksiMap.put(trx.getIdTransaksi(), trx);
+        transaksiMap.put(trx.getIdTransaksi().trim().toUpperCase(), trx);
 
-        // Persist perubahan
-        storageService.simpanDataKendaraan(daftarKendaraan);
-        storageService.simpanDataTransaksi(daftarTransaksi);
+        // Persist perubahan secara konsisten dengan rollback in-memory jika gagal
+        try {
+            storageService.simpanTransaksiDanKendaraan(daftarKendaraan, daftarTransaksi);
+        } catch (RentalException e) {
+            k.setStatusTersedia(true);
+            daftarTransaksi.remove(trx);
+            transaksiMap.remove(trx.getIdTransaksi().trim().toUpperCase());
+            throw e;
+        }
 
         return trx;
     }
 
-    public void prosesPengembalian(String idTransaksi) throws RentalException {
-        TransaksiSewa trx = transaksiMap.get(idTransaksi);
+    public TransaksiSewa prosesPengembalian(String idTransaksi, String tanggalKembaliAktual) throws RentalException {
+        if (idTransaksi == null || idTransaksi.trim().isEmpty()) {
+            throw new DataValidasiException("ID Transaksi tidak boleh kosong.");
+        }
+        TransaksiSewa trx = transaksiMap.get(idTransaksi.trim().toUpperCase());
         if (trx == null) {
-            throw new DataValidasiException("Transaksi dengan ID " + idTransaksi + " tidak ditemukan.");
+            throw new DataValidasiException("Transaksi dengan ID [" + idTransaksi + "] tidak ditemukan.");
         }
         if ("SELESAI".equalsIgnoreCase(trx.getStatusTransaksi())) {
-            throw new DataValidasiException("Transaksi ini sudah diselesaikan sebelumnya.");
+            throw new DataValidasiException("Transaksi [" + idTransaksi + "] sudah berstatus SELESAI dan tidak dapat diselesaikan kembali.");
+        }
+        if ("DIBATALKAN".equalsIgnoreCase(trx.getStatusTransaksi())) {
+            throw new DataValidasiException("Transaksi [" + idTransaksi + "] sudah berstatus DIBATALKAN dan tidak dapat diproses pengembaliannya.");
         }
 
-        trx.selesaikanPengembalian();
+        // Snapshot in-memory state sebelum mutasi
+        String statusLama = trx.getStatusTransaksi();
+        String tglKembaliLama = trx.getTanggalKembaliAktual();
+        int hariTerlambatLama = trx.getHariTerlambat();
+        double dendaLama = trx.getBiayaDenda();
+        boolean statusArmadaLama = (trx.getKendaraan() != null) && trx.getKendaraan().isStatusTersedia();
 
-        storageService.simpanDataKendaraan(daftarKendaraan);
-        storageService.simpanDataTransaksi(daftarTransaksi);
+        // Panggil pengembalian model untuk menghitung denda dan keterlambatan secara polimorfis
+        trx.selesaikanPengembalian(tanggalKembaliAktual);
+
+        // Pastikan armada berstatus tersedia
+        if (trx.getKendaraan() != null) {
+            trx.getKendaraan().setStatusTersedia(true);
+        }
+
+        // Simpan kedua berkas secara transactional aman dengan rollback
+        try {
+            storageService.simpanTransaksiDanKendaraan(daftarKendaraan, daftarTransaksi);
+        } catch (RentalException e) {
+            // Rollback objek in-memory ke kondisi semula jika penyimpanan gagal
+            trx.setStatusTransaksi(statusLama);
+            try {
+                trx.setTanggalKembaliAktual(tglKembaliLama);
+                trx.setHariTerlambat(hariTerlambatLama);
+                trx.setBiayaDenda(dendaLama);
+            } catch (DataValidasiException ignored) {}
+            if (trx.getKendaraan() != null) {
+                trx.getKendaraan().setStatusTersedia(statusArmadaLama);
+            }
+            throw e;
+        }
+
+        return trx;
+    }
+
+    public TransaksiSewa prosesPengembalian(String idTransaksi) throws RentalException {
+        return prosesPengembalian(idTransaksi, LocalDate.now().format(DateTimeFormatter.ofPattern("uuuu-MM-dd")));
     }
 
     public void batalkanTransaksi(String idTransaksi) throws RentalException {
-        TransaksiSewa trx = transaksiMap.get(idTransaksi);
+        if (idTransaksi == null || idTransaksi.trim().isEmpty()) {
+            throw new DataValidasiException("ID Transaksi tidak boleh kosong.");
+        }
+        TransaksiSewa trx = transaksiMap.get(idTransaksi.trim().toUpperCase());
         if (trx == null) {
             throw new DataValidasiException("Transaksi tidak ditemukan.");
         }
         if ("SELESAI".equalsIgnoreCase(trx.getStatusTransaksi())) {
             throw new DataValidasiException("Transaksi yang telah selesai tidak dapat dibatalkan.");
         }
+        if ("DIBATALKAN".equalsIgnoreCase(trx.getStatusTransaksi())) {
+            throw new DataValidasiException("Transaksi sudah dibatalkan sebelumnya.");
+        }
+
+        String statusLama = trx.getStatusTransaksi();
+        boolean statusArmadaLama = (trx.getKendaraan() != null) && trx.getKendaraan().isStatusTersedia();
 
         trx.setStatusTransaksi("DIBATALKAN");
         if (trx.getKendaraan() != null) {
             trx.getKendaraan().setStatusTersedia(true);
         }
 
-        storageService.simpanDataKendaraan(daftarKendaraan);
-        storageService.simpanDataTransaksi(daftarTransaksi);
+        try {
+            storageService.simpanTransaksiDanKendaraan(daftarKendaraan, daftarTransaksi);
+        } catch (RentalException e) {
+            trx.setStatusTransaksi(statusLama);
+            if (trx.getKendaraan() != null) {
+                trx.getKendaraan().setStatusTersedia(statusArmadaLama);
+            }
+            throw e;
+        }
     }
 
     public List<Kendaraan> getKendaraanTersedia() {

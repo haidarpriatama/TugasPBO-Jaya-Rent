@@ -46,6 +46,13 @@ public abstract class Kendaraan {
      */
     public abstract String getSpesifikasiKhusus();
 
+    /**
+     * Mengembalikan tarif denda per hari atas keterlambatan pengembalian unit armada.
+     * Diimplementasikan secara polimorfik oleh kelas turunan (Mobil, Motor, Bus).
+     * @return tarif denda per hari dalam Rupiah
+     */
+    public abstract double getTarifDendaPerHari();
+
     // --- METHOD OVERLOADING (Polimorfisme Overloading) ---
     /**
      * Overloading 1: Menghitung biaya sewa dengan opsi supir.

@@ -43,6 +43,11 @@ public class Bus extends Kendaraan implements Diskonable, LayananTambahan {
                (fasilitasToilet ? "Ada" : "Tidak") + " | Driver Kru: " + (wajibSupir ? "Wajib" : "Opsional");
     }
 
+    @Override
+    public double getTarifDendaPerHari() {
+        return 150000.0; // Denda keterlambatan bus: Rp 150.000/hari
+    }
+
     // --- IMPLEMENTASI INTERFACE Diskonable ---
     @Override
     public double hitungDiskon(int durasiHari, double totalAwal) {

@@ -2,7 +2,12 @@ package rentalkendaraan.service;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import rentalkendaraan.exception.DataValidasiException;
@@ -11,18 +16,122 @@ import rentalkendaraan.model.*;
 
 /**
  * Service untuk menangani persistensi data secara permanen ke media penyimpanan berkas (File I/O).
- * Menerapkan penanganan berkas teks berbasis CSV dengan blok try-catch dan Exception Handling.
+ * Menerapkan penanganan berkas teks berbasis CSV dengan blok try-catch, Exception Handling,
+ * Atomic File Write (.tmp + move), transaksi berkas ganda dengan rollback disk,
+ * serta strict parser whitelisting 10 kolom (lama) dan 13 kolom (baru) yang menjaga record tidak valid tetap aman.
  */
 public class FileStorageService {
-    private static final String DATA_DIR = "data";
-    private static final String FILE_KENDARAAN = DATA_DIR + File.separator + "kendaraan.txt";
-    private static final String FILE_PELANGGAN = DATA_DIR + File.separator + "pelanggan.txt";
-    private static final String FILE_TRANSAKSI = DATA_DIR + File.separator + "transaksi.txt";
+    private final String dataDir;
+    private final String fileKendaraan;
+    private final String filePelanggan;
+    private final String fileTransaksi;
 
+    // DateTimeFormatter presisi menggunakan pola uuuu-MM-dd dengan ResolverStyle.STRICT
+    private static final DateTimeFormatter STRICT_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
+
+    // Menyimpan baris-baris record yang gagal diparse agar tidak terhapus saat penyimpanan ulang
+    private final List<String> barisTransaksiTidakValid = new ArrayList<>();
+
+    /**
+     * Konstruktor default menggunakan direktori bawaan "data".
+     */
     public FileStorageService() {
-        File dir = new File(DATA_DIR);
+        this("data");
+    }
+
+    /**
+     * Konstruktor dengan parameter direktori untuk mendukung pengujian terisolasi
+     * tanpa memodifikasi data riil aplikasi.
+     */
+    public FileStorageService(String dataDir) {
+        this.dataDir = dataDir;
+        this.fileKendaraan = dataDir + File.separator + "kendaraan.txt";
+        this.filePelanggan = dataDir + File.separator + "pelanggan.txt";
+        this.fileTransaksi = dataDir + File.separator + "transaksi.txt";
+
+        File dir = new File(dataDir);
         if (!dir.exists()) {
             dir.mkdirs();
+        }
+    }
+
+    public List<String> getBarisTransaksiTidakValid() {
+        return Collections.unmodifiableList(barisTransaksiTidakValid);
+    }
+
+    public boolean hasBarisTransaksiTidakValid() {
+        return !barisTransaksiTidakValid.isEmpty();
+    }
+
+    // --- HELPER PARSER & VALIDASI STRICT ---
+    private static boolean parseStrictBoolean(String value, String fieldName) throws DataValidasiException {
+        if ("true".equalsIgnoreCase(value)) {
+            return true;
+        } else if ("false".equalsIgnoreCase(value)) {
+            return false;
+        } else {
+            throw new DataValidasiException("Nilai boolean untuk " + fieldName + " tidak valid: '" + value + "' (harus 'true' atau 'false')");
+        }
+    }
+
+    private static int parseStrictPositiveInt(String value, String fieldName) throws DataValidasiException {
+        try {
+            int val = Integer.parseInt(value);
+            if (val <= 0) {
+                throw new DataValidasiException(fieldName + " harus lebih besar dari 0: " + value);
+            }
+            return val;
+        } catch (NumberFormatException e) {
+            throw new DataValidasiException(fieldName + " bukan bilangan bulat valid: '" + value + "'");
+        }
+    }
+
+    private static int parseStrictNonNegativeInt(String value, String fieldName) throws DataValidasiException {
+        try {
+            int val = Integer.parseInt(value);
+            if (val < 0) {
+                throw new DataValidasiException(fieldName + " tidak boleh negatif: " + value);
+            }
+            return val;
+        } catch (NumberFormatException e) {
+            throw new DataValidasiException(fieldName + " bukan bilangan bulat valid: '" + value + "'");
+        }
+    }
+
+    private static double parseStrictNonNegativeDouble(String value, String fieldName) throws DataValidasiException {
+        try {
+            double d = Double.parseDouble(value);
+            if (Double.isNaN(d) || Double.isInfinite(d)) {
+                throw new DataValidasiException(fieldName + " tidak boleh NaN atau Infinite: " + value);
+            }
+            if (d < 0.0) {
+                throw new DataValidasiException(fieldName + " tidak boleh negatif: " + value);
+            }
+            return d;
+        } catch (NumberFormatException e) {
+            throw new DataValidasiException(fieldName + " bukan angka desimal valid: '" + value + "'");
+        }
+    }
+
+    private static void validateStatusTransaksi(String status) throws DataValidasiException {
+        if (!"AKTIF".equalsIgnoreCase(status) &&
+            !"SELESAI".equalsIgnoreCase(status) &&
+            !"DIBATALKAN".equalsIgnoreCase(status)) {
+            throw new DataValidasiException("Status transaksi tidak valid: '" + status + "' (harus AKTIF, SELESAI, atau DIBATALKAN)");
+        }
+    }
+
+    /**
+     * Mengganti target file dengan file temporary secara atomik.
+     */
+    private void atomicReplace(File tempFile, File targetFile) throws IOException {
+        try {
+            Files.move(tempFile.toPath(), targetFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tempFile.toPath(), targetFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
@@ -32,7 +141,7 @@ public class FileStorageService {
      */
     public List<Kendaraan> muatDataKendaraan() throws RentalException {
         List<Kendaraan> list = new ArrayList<>();
-        File file = new File(FILE_KENDARAAN);
+        File file = new File(fileKendaraan);
 
         if (!file.exists()) {
             list = buatDataSampelKendaraan();
@@ -47,7 +156,7 @@ public class FileStorageService {
                 line = line.trim();
                 if (line.isEmpty() || line.startsWith("#")) continue;
 
-                String[] parts = line.split(";");
+                String[] parts = line.split(";", -1);
                 if (parts.length < 8) continue;
 
                 String jenis = parts[0].toUpperCase();
@@ -89,17 +198,28 @@ public class FileStorageService {
     }
 
     /**
-     * Menyimpan seluruh list kendaraan ke dalam file teks secara permanen.
+     * Menyimpan seluruh list kendaraan ke dalam file teks secara permanen dengan atomic write.
      */
     public void simpanDataKendaraan(List<Kendaraan> list) throws RentalException {
+        File targetFile = new File(fileKendaraan);
+        File tempFile = new File(targetFile.getParentFile(), targetFile.getName() + ".tmp");
+
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-                new FileOutputStream(FILE_KENDARAAN), StandardCharsets.UTF_8))) {
+                new FileOutputStream(tempFile), StandardCharsets.UTF_8))) {
             for (Kendaraan k : list) {
                 writer.write(k.toCsvRecord());
                 writer.newLine();
             }
         } catch (IOException e) {
-            throw new RentalException("Gagal menyimpan berkas data kendaraan: " + e.getMessage(), e);
+            if (tempFile.exists()) tempFile.delete();
+            throw new RentalException("Gagal menulis berkas sementara kendaraan: " + e.getMessage(), e);
+        }
+
+        try {
+            atomicReplace(tempFile, targetFile);
+        } catch (IOException e) {
+            if (tempFile.exists()) tempFile.delete();
+            throw new RentalException("Gagal mengganti berkas kendaraan secara atomik: " + e.getMessage(), e);
         }
     }
 
@@ -108,7 +228,7 @@ public class FileStorageService {
      */
     public List<Pelanggan> muatDataPelanggan() throws RentalException {
         List<Pelanggan> list = new ArrayList<>();
-        File file = new File(FILE_PELANGGAN);
+        File file = new File(filePelanggan);
 
         if (!file.exists()) {
             list = buatDataSampelPelanggan();
@@ -123,7 +243,7 @@ public class FileStorageService {
                 line = line.trim();
                 if (line.isEmpty() || line.startsWith("#")) continue;
 
-                String[] parts = line.split(";");
+                String[] parts = line.split(";", -1);
                 if (parts.length >= 6) {
                     Pelanggan p = new Pelanggan(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
                     list.add(p);
@@ -137,27 +257,43 @@ public class FileStorageService {
     }
 
     /**
-     * Menyimpan daftar pelanggan ke berkas penyimpanan.
+     * Menyimpan daftar pelanggan ke berkas penyimpanan dengan atomic write.
      */
     public void simpanDataPelanggan(List<Pelanggan> list) throws RentalException {
+        File targetFile = new File(filePelanggan);
+        File tempFile = new File(targetFile.getParentFile(), targetFile.getName() + ".tmp");
+
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-                new FileOutputStream(FILE_PELANGGAN), StandardCharsets.UTF_8))) {
+                new FileOutputStream(tempFile), StandardCharsets.UTF_8))) {
             for (Pelanggan p : list) {
                 writer.write(p.toCsvRecord());
                 writer.newLine();
             }
         } catch (IOException e) {
-            throw new RentalException("Gagal menyimpan berkas data pelanggan: " + e.getMessage(), e);
+            if (tempFile.exists()) tempFile.delete();
+            throw new RentalException("Gagal menulis berkas sementara pelanggan: " + e.getMessage(), e);
+        }
+
+        try {
+            atomicReplace(tempFile, targetFile);
+        } catch (IOException e) {
+            if (tempFile.exists()) tempFile.delete();
+            throw new RentalException("Gagal mengganti berkas pelanggan secara atomik: " + e.getMessage(), e);
         }
     }
 
     /**
      * Memuat daftar transaksi sewa dari berkas penyimpanan.
+     * Menerima strictly tepat 10 kolom untuk format lama dan 13 kolom untuk format baru.
+     * Record dengan jumlah kolom di luar 10/13 atau data numerik rusak diabaikan secara aman,
+     * dicatat ke konsol, dan disimpan di barisTransaksiTidakValid agar tidak terhapus saat penyimpanan ulang.
      */
     public List<TransaksiSewa> muatDataTransaksi(Map<String, Pelanggan> pelangganMap,
                                                  Map<String, Kendaraan> kendaraanMap) throws RentalException {
         List<TransaksiSewa> list = new ArrayList<>();
-        File file = new File(FILE_TRANSAKSI);
+        File file = new File(fileTransaksi);
+
+        barisTransaksiTidakValid.clear();
 
         if (!file.exists()) {
             return list;
@@ -170,26 +306,90 @@ public class FileStorageService {
                 line = line.trim();
                 if (line.isEmpty() || line.startsWith("#")) continue;
 
-                String[] parts = line.split(";");
-                if (parts.length >= 9) {
-                    String idTrx = parts[0];
-                    String idPel = parts[1];
-                    String idKen = parts[2];
-                    String tgl = parts[3];
-                    int durasi = Integer.parseInt(parts[4]);
-                    boolean supir = Boolean.parseBoolean(parts[5]);
-                    boolean asuransi = Boolean.parseBoolean(parts[6]);
-                    // double totalSaved = Double.parseDouble(parts[7]);
-                    String status = parts[8];
-                    String catatan = (parts.length >= 10) ? parts[9] : "-";
+                // Gunakan split(";", -1) agar kolom kosong di akhir tidak terpotong
+                String[] parts = line.split(";", -1);
 
-                    Pelanggan pel = pelangganMap.get(idPel);
-                    Kendaraan ken = kendaraanMap.get(idKen);
+                // Validasi ketat: Hanya terima format lama tepat 10 kolom atau format baru tepat 13 kolom
+                if (parts.length != 10 && parts.length != 13) {
+                    System.err.println("[Peringatan Integritas Parser] Record transaksi ditolak karena jumlah kolom tidak valid ("
+                            + parts.length + " kolom, diharapkan tepat 10 atau 13): " + line);
+                    barisTransaksiTidakValid.add(line);
+                    continue;
+                }
 
-                    if (pel != null && ken != null) {
-                        TransaksiSewa trx = new TransaksiSewa(idTrx, pel, ken, tgl, durasi, supir, asuransi, status, catatan);
-                        list.add(trx);
+                try {
+                    String idTrx = parts[0].trim();
+                    String idPel = parts[1].trim();
+                    String idKen = parts[2].trim();
+                    String tgl = parts[3].trim();
+
+                    if (idTrx.isEmpty() || idPel.isEmpty() || idKen.isEmpty()) {
+                        throw new DataValidasiException("ID Transaksi, Pelanggan, atau Kendaraan tidak boleh kosong.");
                     }
+
+                    // Validasi tanggal sewa kalender secara presisi
+                    try {
+                        LocalDate.parse(tgl, STRICT_DATE_FORMATTER);
+                    } catch (Exception e) {
+                        throw new DataValidasiException("Format tanggal sewa tidak valid ('" + tgl + "'): " + e.getMessage());
+                    }
+
+                    int durasi = parseStrictPositiveInt(parts[4].trim(), "Durasi sewa");
+                    boolean supir = parseStrictBoolean(parts[5].trim(), "Include supir");
+                    boolean asuransi = parseStrictBoolean(parts[6].trim(), "Include asuransi");
+                    double biayaSewaAwal = parseStrictNonNegativeDouble(parts[7].trim(), "Biaya sewa awal");
+
+                    String status = parts[8].trim().isEmpty() ? "AKTIF" : parts[8].trim().toUpperCase();
+                    validateStatusTransaksi(status);
+
+                    String catatan = parts[9].trim().isEmpty() ? "-" : parts[9].trim();
+
+                    // Default untuk transaksi lama (10 kolom)
+                    String tanggalKembaliAktual = "-";
+                    int hariTerlambat = 0;
+                    double biayaDenda = 0.0;
+
+                    // Jika format baru (13 kolom), baca data denda riil
+                    if (parts.length == 13) {
+                        String tglKembaliRaw = parts[10].trim();
+                        if (!tglKembaliRaw.isEmpty() && !"-".equals(tglKembaliRaw)) {
+                            try {
+                                LocalDate.parse(tglKembaliRaw, STRICT_DATE_FORMATTER);
+                                tanggalKembaliAktual = tglKembaliRaw;
+                            } catch (Exception e) {
+                                throw new DataValidasiException("Tanggal kembali aktual tidak valid ('" + tglKembaliRaw + "'): " + e.getMessage());
+                            }
+                        }
+
+                        hariTerlambat = parseStrictNonNegativeInt(parts[11].trim(), "Hari keterlambatan");
+                        biayaDenda = parseStrictNonNegativeDouble(parts[12].trim(), "Biaya denda");
+                    }
+
+                    Pelanggan pel = pelangganMap.get(idPel.toUpperCase());
+                    if (pel == null) pel = pelangganMap.get(idPel);
+
+                    Kendaraan ken = kendaraanMap.get(idKen.toUpperCase());
+                    if (ken == null) ken = kendaraanMap.get(idKen);
+
+                    // Validasi referensi integritas foreign key
+                    if (pel == null || ken == null) {
+                        System.err.println("[Peringatan Integritas Relasi] Record transaksi ditolak karena ID referensi tidak ditemukan (Pelanggan: "
+                                + idPel + ", Kendaraan: " + idKen + "): " + line);
+                        barisTransaksiTidakValid.add(line);
+                        continue;
+                    }
+
+                    TransaksiSewa trx = new TransaksiSewa(
+                            idTrx, pel, ken, tgl, durasi, supir, asuransi,
+                            biayaSewaAwal, status, catatan,
+                            tanggalKembaliAktual, hariTerlambat, biayaDenda
+                    );
+                    list.add(trx);
+
+                } catch (Exception e) {
+                    System.err.println("[Peringatan Integritas Data] Record transaksi ditolak karena kesalahan validasi ("
+                            + e.getMessage() + "): " + line);
+                    barisTransaksiTidakValid.add(line);
                 }
             }
         } catch (Exception e) {
@@ -200,17 +400,89 @@ public class FileStorageService {
     }
 
     /**
-     * Menyimpan daftar transaksi sewa ke berkas penyimpanan.
+     * Menyimpan daftar transaksi sewa ke berkas penyimpanan dengan atomic write (.tmp + atomic move).
+     * Seluruh baris transaksi tidak valid juga dipertahankan agar tidak hilang dari disk.
      */
     public void simpanDataTransaksi(List<TransaksiSewa> list) throws RentalException {
+        File targetFile = new File(fileTransaksi);
+        File tempFile = new File(targetFile.getParentFile(), targetFile.getName() + ".tmp");
+
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-                new FileOutputStream(FILE_TRANSAKSI), StandardCharsets.UTF_8))) {
+                new FileOutputStream(tempFile), StandardCharsets.UTF_8))) {
             for (TransaksiSewa t : list) {
                 writer.write(t.toCsvRecord());
                 writer.newLine();
             }
+            // Tuliskan kembali baris transaksi tidak valid agar record yang rusak tidak hilang dari disk
+            for (String barisRusak : barisTransaksiTidakValid) {
+                writer.write(barisRusak);
+                writer.newLine();
+            }
         } catch (IOException e) {
-            throw new RentalException("Gagal menyimpan berkas data transaksi: " + e.getMessage(), e);
+            if (tempFile.exists()) tempFile.delete();
+            throw new RentalException("Gagal menulis berkas sementara transaksi: " + e.getMessage(), e);
+        }
+
+        try {
+            atomicReplace(tempFile, targetFile);
+        } catch (IOException e) {
+            if (tempFile.exists()) tempFile.delete();
+            throw new RentalException("Gagal mengganti berkas transaksi secara atomik: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Menyimpan data transaksi dan kendaraan secara transactional konsisten.
+     * Jika salah satu penyimpanan gagal, berkas yang sudah tertulis akan di-rollback ke snapshot sebelumnya.
+     * Jika berkas awalnya belum ada, berkas baru yang sempat dibuat akan dihapus saat rollback.
+     */
+    public void simpanTransaksiDanKendaraan(List<Kendaraan> kList, List<TransaksiSewa> tList) throws RentalException {
+        File fKen = new File(fileKendaraan);
+        File fTrx = new File(fileTransaksi);
+        boolean fKenExisted = fKen.exists();
+        boolean fTrxExisted = fTrx.exists();
+        byte[] backupKen = null;
+        byte[] backupTrx = null;
+
+        try {
+            if (fKenExisted) backupKen = Files.readAllBytes(fKen.toPath());
+            if (fTrxExisted) backupTrx = Files.readAllBytes(fTrx.toPath());
+        } catch (IOException e) {
+            throw new RentalException("Gagal mencadangkan berkas sebelum penyimpanan: " + e.getMessage(), e);
+        }
+
+        boolean kenSaved = false;
+        try {
+            simpanDataKendaraan(kList);
+            kenSaved = true;
+        } catch (RentalException eKen) {
+            throw new RentalException("Gagal menyimpan berkas kendaraan: " + eKen.getMessage(), eKen);
+        }
+
+        try {
+            simpanDataTransaksi(tList);
+        } catch (RentalException eTrx) {
+            // Rollback berkas kendaraan ke snapshot sebelumnya jika penulisan transaksi gagal
+            String rollbackError = null;
+            if (kenSaved) {
+                try {
+                    if (fKenExisted && backupKen != null) {
+                        Files.write(fKen.toPath(), backupKen, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                    } else if (!fKenExisted && fKen.exists()) {
+                        Files.delete(fKen.toPath());
+                    }
+                } catch (IOException eRollback) {
+                    rollbackError = eRollback.getMessage();
+                }
+            }
+            if (rollbackError != null) {
+                throw new RentalException("KRITIS: Gagal menyimpan data transaksi (" + eTrx.getMessage()
+                        + ") dan pemulihan berkas kendaraan juga GAGAL (" + rollbackError
+                        + "). Integritas berkas perlu diperiksa!", eTrx);
+            } else {
+                throw new RentalException("Gagal menyimpan data transaksi: " + eTrx.getMessage()
+                        + ". Berkas kendaraan telah berhasil dipulihkan ke kondisi semula.", eTrx);
+            }
         }
     }
 

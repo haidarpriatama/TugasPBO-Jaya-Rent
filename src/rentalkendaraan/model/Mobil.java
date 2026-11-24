@@ -42,6 +42,11 @@ public class Mobil extends Kendaraan implements Diskonable, LayananTambahan {
         return "Tipe: " + tipeMobil + " | Transmisi: " + transmisi + " | " + kapasitasPenumpang + " Kursi";
     }
 
+    @Override
+    public double getTarifDendaPerHari() {
+        return 50000.0; // Denda keterlambatan mobil: Rp 50.000/hari
+    }
+
     // --- IMPLEMENTASI INTERFACE Diskonable ---
     @Override
     public double hitungDiskon(int durasiHari, double totalAwal) {

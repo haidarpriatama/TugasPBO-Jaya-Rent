@@ -4,12 +4,14 @@ import java.awt.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import rentalkendaraan.model.Kendaraan;
 import rentalkendaraan.service.RentalManager;
 
 /**
  * Frame Utama Aplikasi Rental Kendaraan (Main Dashboard).
- * Mengintegrasikan JMenuBar, JTabbedPane, Status Bar, serta sinkronisasi antarmuka panel.
+ * Mengintegrasikan JMenuBar, JTabbedPane, Status Bar, serta sinkronisasi antarmuka panel
+ * dengan tema Modern Green and White (UITheme).
  */
 public class MainDashboardFrame extends JFrame {
     private final RentalManager manager;
@@ -34,57 +36,79 @@ public class MainDashboardFrame extends JFrame {
     }
 
     private void initComponents() {
-        setTitle("Sistem Manajemen Rental Kendaraan - Kelompok 7 (PBO 2026)");
-        setSize(1100, 720);
-        setMinimumSize(new Dimension(900, 600));
+        setTitle("Sistem Manajemen Rental Kendaraan Jaya Rent - Kelompok 7 (PBO 2026)");
+        setSize(1120, 740);
+        setMinimumSize(new Dimension(940, 620));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
+        getContentPane().setBackground(UITheme.WHITE);
 
-        // --- MENU BAR ---
+        // --- 1. MENU BAR ---
         setJMenuBar(createMenuBar());
 
-        // --- HEADER BANNER ---
-        JPanel panelHeader = new JPanel(new BorderLayout(10, 10));
-        panelHeader.setBackground(new Color(15, 23, 42)); // Slate 900
-        panelHeader.setBorder(BorderFactory.createEmptyBorder(14, 20, 14, 20));
+        // --- 2. HEADER BANNER (DARK GREEN & LIGHT GREEN ACCENTS) ---
+        JPanel panelHeader = new JPanel(new BorderLayout(12, 10));
+        panelHeader.setBackground(UITheme.DARK_GREEN);
+        panelHeader.setBorder(new EmptyBorder(16, 24, 16, 24));
 
-        JPanel panelTitle = new JPanel(new GridLayout(2, 1, 2, 2));
+        // Left Header: Brand App Title & Subtitle
+        JPanel panelTitle = new JPanel(new GridLayout(2, 1, 2, 3));
         panelTitle.setOpaque(false);
 
         JLabel lblAppName = new JLabel("RENTAL KENDARAAN JAYA RENT CAR");
-        lblAppName.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        lblAppName.setForeground(new Color(248, 250, 252));
+        lblAppName.setFont(UITheme.FONT_TITLE_LARGE);
+        lblAppName.setForeground(UITheme.WHITE);
         panelTitle.add(lblAppName);
 
         JLabel lblAppDesc = new JLabel("Sistem Informasi Manajemen Armada & Penyewaan Berbasis OOP (MVC)");
-        lblAppDesc.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        lblAppDesc.setForeground(new Color(148, 163, 184));
+        lblAppDesc.setFont(UITheme.FONT_REGULAR);
+        lblAppDesc.setForeground(UITheme.LIGHT_GREEN);
         panelTitle.add(lblAppDesc);
 
         panelHeader.add(panelTitle, BorderLayout.WEST);
 
-        // Right Info: User & Timestamp
-        JPanel panelUserInfo = new JPanel(new GridLayout(2, 1, 2, 2));
+        // Right Header: User Role Badge & Timestamp
+        JPanel panelUserInfo = new JPanel(new GridLayout(2, 1, 2, 4));
         panelUserInfo.setOpaque(false);
 
-        JLabel lblUser = new JLabel("Pengguna: " + activeUser + " (" + activeRole + ")", JLabel.RIGHT);
-        lblUser.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        lblUser.setForeground(new Color(56, 189, 248)); // Sky 400
-        panelUserInfo.add(lblUser);
+        JPanel panelBadgeUser = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        panelBadgeUser.setOpaque(false);
+
+        JLabel lblUserTitle = new JLabel("Pengguna Aktif:");
+        lblUserTitle.setFont(UITheme.FONT_SMALL);
+        lblUserTitle.setForeground(UITheme.LIGHT_GREEN);
+        panelBadgeUser.add(lblUserTitle);
+
+        JLabel lblBadge = new JLabel(" " + activeUser + " (" + activeRole + ") ");
+        lblBadge.setFont(UITheme.FONT_SMALL_BOLD);
+        lblBadge.setForeground(UITheme.DARK_GREEN);
+        lblBadge.setOpaque(true);
+        lblBadge.setBackground(UITheme.LIGHT_GREEN);
+        lblBadge.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UITheme.GREEN_BORDER, 1),
+                BorderFactory.createEmptyBorder(2, 6, 2, 6)));
+        panelBadgeUser.add(lblBadge);
+        panelUserInfo.add(panelBadgeUser);
 
         String tglSekarang = LocalDateTime.now().format(DateTimeFormatter.ofPattern("EEEE, dd MMMM yyyy"));
         JLabel lblDate = new JLabel(tglSekarang, JLabel.RIGHT);
-        lblDate.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        lblDate.setForeground(new Color(203, 213, 225));
+        lblDate.setFont(UITheme.FONT_SMALL);
+        lblDate.setForeground(new Color(0xE2, 0xF9, 0xE7)); // Soft light green-white
         panelUserInfo.add(lblDate);
 
         panelHeader.add(panelUserInfo, BorderLayout.EAST);
         add(panelHeader, BorderLayout.NORTH);
 
-        // --- CENTER: TABBED PANE DENGAN 3 PANEL UTAMA ---
+        // --- 3. CENTER: TABBED PANE DENGAN STYLING HIJAU-PUTIH ---
+        UIManager.put("TabbedPane.selected", UITheme.SOFT_GREEN);
+        UIManager.put("TabbedPane.tabInsets", new Insets(8, 20, 8, 20));
+
         tabbedPane = new JTabbedPane();
-        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        tabbedPane.setFont(UITheme.FONT_SUBTITLE);
+        tabbedPane.setBackground(UITheme.WHITE);
+        tabbedPane.setForeground(UITheme.DARK_GREEN);
+        tabbedPane.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, UITheme.BORDER));
 
         // Callback ketika ada mutasi data untuk menyinkronkan seluruh panel
         Runnable syncCallback = () -> {
@@ -104,32 +128,44 @@ public class MainDashboardFrame extends JFrame {
 
         add(tabbedPane, BorderLayout.CENTER);
 
-        // --- BOTTOM: STATUS BAR ---
-        JPanel panelStatusBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 6));
-        panelStatusBar.setBackground(new Color(241, 245, 249));
-        panelStatusBar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(203, 213, 225)));
+        // --- 4. BOTTOM: STATUS BAR (SOFT GREEN & GREEN BORDER) ---
+        JPanel panelStatusBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 8));
+        panelStatusBar.setBackground(UITheme.SOFT_GREEN);
+        panelStatusBar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, UITheme.GREEN_BORDER));
 
         lblStatusArmada = new JLabel("Armada: 0 Unit");
-        lblStatusArmada.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lblStatusArmada.setFont(UITheme.FONT_BOLD);
+        lblStatusArmada.setForeground(UITheme.DARK_GREEN);
         panelStatusBar.add(lblStatusArmada);
 
-        panelStatusBar.add(new JSeparator(SwingConstants.VERTICAL));
+        JSeparator sep1 = new JSeparator(SwingConstants.VERTICAL);
+        sep1.setPreferredSize(new Dimension(2, 16));
+        sep1.setForeground(UITheme.GREEN_BORDER);
+        panelStatusBar.add(sep1);
 
         lblStatusPelanggan = new JLabel("Pelanggan: 0 Orang");
-        lblStatusPelanggan.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lblStatusPelanggan.setFont(UITheme.FONT_BOLD);
+        lblStatusPelanggan.setForeground(UITheme.DARK_GREEN);
         panelStatusBar.add(lblStatusPelanggan);
 
-        panelStatusBar.add(new JSeparator(SwingConstants.VERTICAL));
+        JSeparator sep2 = new JSeparator(SwingConstants.VERTICAL);
+        sep2.setPreferredSize(new Dimension(2, 16));
+        sep2.setForeground(UITheme.GREEN_BORDER);
+        panelStatusBar.add(sep2);
 
         lblStatusTransaksi = new JLabel("Transaksi: 0");
-        lblStatusTransaksi.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lblStatusTransaksi.setFont(UITheme.FONT_BOLD);
+        lblStatusTransaksi.setForeground(UITheme.DARK_GREEN);
         panelStatusBar.add(lblStatusTransaksi);
 
-        panelStatusBar.add(new JSeparator(SwingConstants.VERTICAL));
+        JSeparator sep3 = new JSeparator(SwingConstants.VERTICAL);
+        sep3.setPreferredSize(new Dimension(2, 16));
+        sep3.setForeground(UITheme.GREEN_BORDER);
+        panelStatusBar.add(sep3);
 
-        JLabel lblStorage = new JLabel("Media Penyimpanan: Berkas Teks CSV Permanen (data/*.txt)");
-        lblStorage.setFont(new Font("Segoe UI", Font.ITALIC, 11));
-        lblStorage.setForeground(new Color(71, 85, 105));
+        JLabel lblStorage = new JLabel("Penyimpanan: Berkas Teks CSV Permanen (data/*.txt)");
+        lblStorage.setFont(UITheme.FONT_SMALL);
+        lblStorage.setForeground(UITheme.TEXT_SECONDARY);
         panelStatusBar.add(lblStorage);
 
         add(panelStatusBar, BorderLayout.SOUTH);
@@ -137,15 +173,21 @@ public class MainDashboardFrame extends JFrame {
 
     private JMenuBar createMenuBar() {
         JMenuBar menuBar = new JMenuBar();
-        menuBar.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        menuBar.setFont(UITheme.FONT_REGULAR);
+        menuBar.setBackground(UITheme.WHITE);
+        menuBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UITheme.BORDER));
 
         // Menu Berkas
         JMenu menuBerkas = new JMenu("Berkas");
+        menuBerkas.setFont(UITheme.FONT_REGULAR);
+        menuBerkas.setForeground(UITheme.TEXT_PRIMARY);
+
         JMenuItem itemLogout = new JMenuItem("Logout Pengguna");
+        itemLogout.setFont(UITheme.FONT_REGULAR);
         itemLogout.addActionListener(e -> {
             int confirm = JOptionPane.showConfirmDialog(this,
-                    "Apakah Anda yakin ingin logout?", "Konfirmasi Logout",
-                    JOptionPane.YES_NO_OPTION);
+                    "Apakah Anda yakin ingin logout dari sistem?", "Konfirmasi Logout",
+                    JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
             if (confirm == JOptionPane.YES_OPTION) {
                 dispose();
                 SwingUtilities.invokeLater(() -> new LoginFrame(manager).setVisible(true));
@@ -153,6 +195,7 @@ public class MainDashboardFrame extends JFrame {
         });
 
         JMenuItem itemKeluar = new JMenuItem("Keluar Aplikasi");
+        itemKeluar.setFont(UITheme.FONT_REGULAR);
         itemKeluar.addActionListener(e -> System.exit(0));
 
         menuBerkas.add(itemLogout);
@@ -162,10 +205,15 @@ public class MainDashboardFrame extends JFrame {
 
         // Menu Master Data
         JMenu menuMaster = new JMenu("Data Master");
+        menuMaster.setFont(UITheme.FONT_REGULAR);
+        menuMaster.setForeground(UITheme.TEXT_PRIMARY);
+
         JMenuItem itemKendaraan = new JMenuItem("Manajemen Armada Kendaraan");
+        itemKendaraan.setFont(UITheme.FONT_REGULAR);
         itemKendaraan.addActionListener(e -> tabbedPane.setSelectedIndex(0));
 
         JMenuItem itemPelanggan = new JMenuItem("Manajemen Data Pelanggan");
+        itemPelanggan.setFont(UITheme.FONT_REGULAR);
         itemPelanggan.addActionListener(e -> tabbedPane.setSelectedIndex(1));
 
         menuMaster.add(itemKendaraan);
@@ -174,14 +222,22 @@ public class MainDashboardFrame extends JFrame {
 
         // Menu Transaksi
         JMenu menuTransaksi = new JMenu("Transaksi");
+        menuTransaksi.setFont(UITheme.FONT_REGULAR);
+        menuTransaksi.setForeground(UITheme.TEXT_PRIMARY);
+
         JMenuItem itemSewa = new JMenuItem("Penyewaan & Pengembalian Armada");
+        itemSewa.setFont(UITheme.FONT_REGULAR);
         itemSewa.addActionListener(e -> tabbedPane.setSelectedIndex(2));
         menuTransaksi.add(itemSewa);
         menuBar.add(menuTransaksi);
 
         // Menu Bantuan
         JMenu menuBantuan = new JMenu("Bantuan");
-        JMenuItem itemAbout = new JMenuItem("Tentang Aplikasi & Kelompok");
+        menuBantuan.setFont(UITheme.FONT_REGULAR);
+        menuBantuan.setForeground(UITheme.TEXT_PRIMARY);
+
+        JMenuItem itemAbout = new JMenuItem("Tentang Aplikasi & Pengembang");
+        itemAbout.setFont(UITheme.FONT_REGULAR);
         itemAbout.addActionListener(e -> tampilkanTentangAplikasi());
         menuBantuan.add(itemAbout);
         menuBar.add(menuBantuan);
@@ -205,7 +261,7 @@ public class MainDashboardFrame extends JFrame {
                     SISTEM APLIKASI RENTAL KENDARAAN (JAYA RENT)
                 =======================================================
                 Tugas Proyek Pemrograman Berorientasi Objek (PBO) GUI 2026
-                Tema: Rental Kendaraan
+                Tema: Rental Kendaraan Modern
                 Kelompok: 7
                 
                 Anggota Tim:

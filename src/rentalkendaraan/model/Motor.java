@@ -43,6 +43,11 @@ public class Motor extends Kendaraan {
                (includeHelmDua ? "Ya" : "Tidak");
     }
 
+    @Override
+    public double getTarifDendaPerHari() {
+        return 25000.0; // Denda keterlambatan motor: Rp 25.000/hari
+    }
+
     // --- GETTER & SETTER DENGAN VALIDASI ---
     public String getTipeMotor() {
         return tipeMotor;
